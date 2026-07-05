@@ -1,11 +1,11 @@
 // Supabase Edge Function: daily-digest
-// Runs every morning, checks each artist's tasks for today, sends a digest email via Resend.
+// Runs every morning, checks each artist's tasks for today, sends a digest email via Brevo.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -29,18 +29,19 @@ function myCheckState(task, checks, userKey) {
   return !!c[userKey];
 }
 
-function sendEmail(to, subject, html) {
-  return fetch("https://api.resend.com/emails", {
+function sendEmail(to, toName, subject, html) {
+  return fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
-      "Authorization": "Bearer " + RESEND_API_KEY,
-      "Content-Type": "application/json"
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
     },
     body: JSON.stringify({
-      from: "Sintraa Schedule <onboarding@resend.dev>",
-      to: [to],
+      sender: { name: "Sintraa Schedule", email: "sintraacentra@gmail.com" },
+      to: [{ email: to, name: toName }],
       subject: subject,
-      html: html
+      htmlContent: html
     })
   }).then(function (res) {
     if (!res.ok) {
@@ -135,7 +136,7 @@ Deno.serve(async function (_req) {
       var todayLabel = todayDay ? todayDay.day : "No schedule entry for today";
       var html = buildEmailHTML(USER_LABELS[artistKey], todayLabel, tasks);
       var subject = "Sintraa - " + tasks.length + " task" + (tasks.length !== 1 ? "s" : "") + " today";
-      var ok = await sendEmail(email, subject, html);
+      var ok = await sendEmail(email, USER_LABELS[artistKey], subject, html);
       results.push(artistKey + ": " + (ok ? "sent" : "failed") + " (" + tasks.length + " tasks)");
     }
 
